@@ -1,0 +1,20 @@
+# The ONLY source of answers for legal/eligibility questions on application forms.
+# Rule: if a form asks something not covered here, the agent marks the application needs_manual.
+# Keep this repo private — this file holds personal data.
+work_authorization:
+  authorized_to_work_in_us: null        # true / false
+  requires_sponsorship_now: null
+  requires_sponsorship_future: null
+start_date: null                        # e.g. "2027-06-01" or "2 weeks after offer"
+salary_expectation: null                # e.g. "Open / market rate" or a range
+willing_to_relocate: null
+eeo:                                    # "Decline to self-identify" is always a valid answer
+  gender: Decline to self-identify
+  race_ethnicity: Decline to self-identify
+  veteran_status: Decline to self-identify
+  disability_status: Decline to self-identify
+references_available: null
+links:
+  linkedin: null
+  github: null
+  portfolio: null

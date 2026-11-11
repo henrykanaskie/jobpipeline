@@ -1,0 +1,16 @@
+# Boards to crawl. `token` is the slug in the board's URL:
+#   greenhouse: boards.greenhouse.io/<token>     lever: jobs.lever.co/<token>
+#   ashby:      jobs.ashbyhq.com/<token>
+# These are examples: check each one returns jobs (python -m jobpipeline.crawler --once) before relying on it.
+greenhouse:
+  - {token: stripe, company: Stripe}
+  - {token: discord, company: Discord}
+  - {token: databricks, company: Databricks}
+lever:
+  - {token: palantir, company: Palantir}
+ashby:
+  - {token: ramp, company: Ramp}
+  - {token: notion, company: Notion}
+simplify:
+  - token: new-grad
+    url: https://raw.githubusercontent.com/SimplifyJobs/New-Grad-Positions/dev/.github/scripts/listings.json

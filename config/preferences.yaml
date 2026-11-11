@@ -1,0 +1,24 @@
+# Keyword pre-filter: cheap, deterministic gate before any LLM call.
+# Matching is case-insensitive, on whole words/phrases.
+title_include:      # at least one must appear in the title
+  - software engineer
+  - software developer
+  - backend
+  - full stack
+  - machine learning
+  - data engineer
+  - new grad
+title_exclude:      # any match rejects the posting
+  - senior
+  - staff
+  - principal
+  - lead
+  - manager
+  - director
+  - intern
+  - sr
+location_include:   # empty list = any location; otherwise at least one must appear
+  - remote
+  - new york
+  - san francisco
+  - seattle

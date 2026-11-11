@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Job Postings</title>
+<style>
+  :root { --bg:#fff; --fg:#1a1a1a; --muted:#666; --line:#e5e5e5; --accent:#2457d6; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#141414; --fg:#eee; --muted:#999; --line:#2a2a2a; --accent:#7aa2ff; } }
+  body { margin:0; padding:16px; background:var(--bg); color:var(--fg); font:15px/1.4 system-ui, sans-serif; }
+  header { display:flex; flex-wrap:wrap; gap:8px; align-items:baseline; margin-bottom:12px; }
+  h1 { font-size:20px; margin:0 12px 0 0; }
+  #meta { color:var(--muted); font-size:13px; }
+  input, select { font:inherit; padding:6px 8px; border:1px solid var(--line); border-radius:6px; background:var(--bg); color:var(--fg); }
+  input { flex:1; min-width:180px; }
+  table { width:100%; border-collapse:collapse; }
+  th, td { text-align:left; padding:8px 6px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; }
+  td.score { font-variant-numeric:tabular-nums; width:3em; }
+  a { color:var(--accent); text-decoration:none; }
+  .sub { color:var(--muted); font-size:13px; }
+  @media (max-width:640px) { .hide-sm { display:none; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Job Postings</h1>
+  <input id="q" type="search" placeholder="Filter by title, company, location">
+  <select id="src"><option value="">All sources</option></select>
+  <span id="meta"></span>
+</header>
+<table>
+  <thead><tr><th>Fit</th><th>Role</th><th class="hide-sm">Location</th><th class="hide-sm">Seen</th></tr></thead>
+  <tbody id="rows"></tbody>
+</table>
+<script>
+let data = [];
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function render() {
+  const words = $("q").value.toLowerCase().split(/\s+/).filter(Boolean), src = $("src").value;
+  const rows = data.filter(p => (!src || p.source === src) &&
+    words.every(w => `${p.title} ${p.company} ${p.location}`.toLowerCase().includes(w)));
+  $("rows").innerHTML = rows.slice(0, 500).map(p => `<tr>
+    <td class="score">${p.fit_score == null ? "–" : Math.round(p.fit_score)}</td>
+    <td><a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.title)}</a>
+        <div class="sub">${esc(p.company)}${p.application_status ? " · " + esc(p.application_status) : ""}</div></td>
+    <td class="hide-sm">${esc(p.location)}</td>
+    <td class="hide-sm sub">${esc(p.first_seen_at.slice(0, 10))}</td></tr>`).join("");
+  $("meta").textContent = `${rows.length} shown`;
+}
+fetch("data.json", {cache: "no-store"}).then(r => r.json()).then(d => {
+  data = d.postings;
+  [...new Set(data.map(p => p.source))].sort().forEach(s => $("src").add(new Option(s, s)));
+  $("meta").textContent = `snapshot ${new Date(d.generated_at).toLocaleString()}`;
+  render();
+}).catch(() => { $("meta").textContent = "data.json not found — run the exporter"; });
+$("q").addEventListener("input", render);
+$("src").addEventListener("change", render);
+</script>
+</body>
+</html>
