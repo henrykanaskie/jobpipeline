@@ -15,5 +15,10 @@ def test_url_strips_tracking_but_keeps_ids():
 
 
 def test_html_to_text_double_escaped():
-    assert html_to_text("&lt;p&gt;Hello &amp;amp; welcome&lt;/p&gt;&lt;ul&gt;&lt;li&gt;Python&lt;/li&gt;") == \
-        "Hello & welcome\nPython"
+    out = html_to_text("&lt;p&gt;Hello &amp;amp; welcome&lt;/p&gt;&lt;ul&gt;&lt;li&gt;Python&lt;/li&gt;")
+    assert [l for l in out.splitlines() if l] == ["Hello & welcome", "Python"]
+
+
+def test_html_to_text_opening_p_is_a_break():
+    # Hacker News uses <p> as a separator with no closing tag
+    assert html_to_text("A | B<p>Body").splitlines()[0] == "A | B"

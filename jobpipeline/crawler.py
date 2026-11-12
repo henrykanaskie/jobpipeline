@@ -8,38 +8,24 @@ import logging
 import os
 import time
 
-import requests
-
-from . import config, db, notify
+from . import config, db, http, notify
 from .sources import SOURCES
 
 log = logging.getLogger("crawler")
-USER_AGENT = "jobpipeline-crawler/0.1 (personal job search)"
 PAUSE_BETWEEN_BOARDS = 1.0   # seconds; be polite to public APIs
 
 
-def fetch_json(session: requests.Session, url: str, attempts: int = 4):
-    """GET with exponential backoff on 429/5xx and network errors."""
-    for i in range(attempts):
-        try:
-            r = session.get(url, timeout=30)
-            if r.status_code == 429 or r.status_code >= 500:
-                raise requests.HTTPError(f"HTTP {r.status_code}", response=r)
-            r.raise_for_status()
-            return r.json()
-        except (requests.ConnectionError, requests.Timeout, requests.HTTPError) as e:
-            retryable = not isinstance(e, requests.HTTPError) or (
-                e.response is not None and (e.response.status_code == 429 or e.response.status_code >= 500))
-            if not retryable or i == attempts - 1:
-                raise
-            time.sleep(2 ** (i + 1))
+def fetch_payload(sess, source_mod, board: dict):
+    if hasattr(source_mod, "fetch"):
+        return source_mod.fetch(sess, board)
+    return http.get_json(sess, source_mod.url(board))
 
 
 def crawl_board(conn, session, source_mod, board: dict) -> list[dict]:
     name, token = source_mod.NAME, board["token"]
     fetched, inserted, error = 0, [], None
     try:
-        postings = source_mod.parse(fetch_json(session, source_mod.url(board)), board)
+        postings = source_mod.parse(fetch_payload(session, source_mod, board), board)
         fetched = len(postings)
         inserted = db.insert_postings(conn, postings)
     except Exception as e:   # one broken board must not stop the rest
@@ -61,8 +47,7 @@ def crawl_board(conn, session, source_mod, board: dict) -> list[dict]:
 
 def crawl_once(conn) -> int:
     boards = config.load("sources.yaml")
-    session = requests.Session()
-    session.headers["User-Agent"] = USER_AGENT
+    session = http.session()
     new_rows = []
     for source_name, board_list in boards.items():
         mod = SOURCES.get(source_name)
@@ -87,6 +72,7 @@ def main():
         while True:
             started = time.monotonic()
             log.info("crawl done: %d new postings", crawl_once(conn))
+            notify.heartbeat("HEARTBEAT_URL_CRAWLER")
             if args.once:
                 return
             time.sleep(max(0, interval - (time.monotonic() - started)))

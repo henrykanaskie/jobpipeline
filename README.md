@@ -1,57 +1,73 @@
 # jobpipeline
 
-Job crawler → Postings DB → screening → MCP, per the build plan. This repo holds the
-**mechanical** parts; the judgment-heavy parts are listed under *Not built yet*.
+Job crawler → Postings DB → screening → your resume service → Codex in a live browser.
+This repo holds everything except the resume service (scoring + tailoring), which is yours;
+its contract is in [`docs/resume-service.md`](docs/resume-service.md). What's left to do is in
+[`docs/TODO.md`](docs/TODO.md).
 
-## What's here
+## Services (`docker compose up -d --build`)
 
-| Piece | Command | Plan phase |
-| --- | --- | --- |
-| Postgres schema (`postings`, `applications`, `source_runs`) | `db/schema.sql`, applied on start | 1 |
-| Crawler: Greenhouse, Lever, Ashby, Simplify; URL dedupe; zero-result/error alerts | `python -m jobpipeline.crawler [--once]` | 2, 3 (partial) |
-| Screening (deterministic): applied-company skip, keyword pre-filter, 30-min CAPTCHA timeout | `python -m jobpipeline.screening [--once]` | 4 (partial), 8 (timeout) |
-| Discord webhook: new jobs, source breakage/recovery, CAPTCHA timeouts | `jobpipeline/notify.py` | 4 (partial) |
-| `data.json` export + static browse page + Vercel deploy script | `python -m jobpipeline.export`, `scripts/publish_web.sh` | 5 |
-| MCP server: `search_jobs`, `get_posting`, `record_application` | `python -m jobpipeline.mcp_server [--http]` | 6 |
-| Templates: `data/profile.md`, `data/standard_answers.yaml` | — | prerequisites |
+| Service | What it does |
+| --- | --- |
+| `postgres` | Postings DB. Schema in `db/schema.sql`, applied/upgraded automatically on start |
+| `crawler` | Every 15 min: Greenhouse, Lever, Ashby, Simplify, Workday, Hacker News → `postings`. URL dedupe + cross-source dedupe (same company + title from another source within 45 days). Alerts when a board breaks or recovers |
+| `screening` | Every 60 s: CAPTCHA timeout → applied-company skip → keyword pre-filter → fetch missing descriptions → `/score` → `/tailor` for matches → poll until tailored |
+| `mcp` | MCP server for Claude Code and Codex (tools below) |
+| `browser` | Chromium + noVNC. You watch/solve CAPTCHAs from your phone; Codex drives it over CDP |
+| `backup` | Nightly `pg_dump` to `./backups`, keeps 14 days |
 
-Posting status flow: `new` → `skipped_applied` | `filtered_out` | `pending_score` → (`screened` → `tailored`, not built).
+Posting status flow:
 
-## Run it
+```
+new ─┬─> skipped_applied
+     ├─> filtered_out
+     └─> pending_score ─┬─> screened                  (score < MATCH_THRESHOLD)
+                        └─> tailoring ─┬─> tailored    (resume_path set)
+                                       └─> tailor_failed
+```
+
+MCP tools: `search_jobs`, `get_posting`, `record_application`, `report_captcha`, `ask_human`,
+`list_applications`, `get_standard_answers`.
+
+Notifications (Discord webhooks): new postings go to the feed channel; matches, CAPTCHAs, tailored resumes,
+source breakage and resume-service outages go to the alert channel.
+
+## Setup
 
 ```bash
-cp .env.example .env        # set POSTGRES_PASSWORD, DISCORD_WEBHOOK_URL
+cp .env.example .env          # fill it in; comments explain each value
 docker compose up -d --build
-docker compose logs -f crawler
+docker compose logs -f crawler screening
 ```
 
-Edit `config/sources.yaml` (boards) and `config/preferences.yaml` (pre-filter); both are
-mounted read-only and picked up on the next loop.
-
-**Reach it from the Mac over Tailscale** (ports bind to localhost on the host on purpose):
+Expose to your tailnet (all ports bind to localhost on the host):
 
 ```bash
-tailscale serve --bg --tcp 5432 tcp://localhost:5432
 tailscale serve --bg --tcp 8765 tcp://localhost:8765
+tailscale serve --bg --https 6080 http://localhost:6080
+tailscale serve --bg --tcp 9222 tcp://localhost:9222
 ```
 
-**Claude Code → MCP** (on the Mac): `claude mcp add --transport http jobs http://<host-tailscale-name>:8765/mcp`
+- Claude Code (Mac): `claude mcp add --transport http jobs http://<host>:8765/mcp`
+- Codex: same MCP URL, plus a Playwright/CDP connection to `http://<host tailscale IP>:9222`; runbook in [`AGENTS.md`](AGENTS.md)
+- Phone: open `LIVE_BROWSER_URL` and log in with `VNC_PASSWORD`
+- Web UI: `scripts/publish_web.sh` every 2 h from cron (see the script header)
+- Threshold review: `python -m jobpipeline.report` monthly
 
-**Web UI**: deploy `web/` as a Vercel project, put `VERCEL_TOKEN` in `.env`, cron `scripts/publish_web.sh` every 2 h.
-Note the site is public by default; anyone with the URL sees your fit scores and application statuses.
+Config files are mounted read-only and re-read on every loop: `config/sources.yaml` (boards),
+`config/preferences.yaml` (pre-filter).
 
 ## Tests
 
 ```bash
 pip install -e '.[dev]'
-pytest                                                   # unit tests
-TEST_DATABASE_URL=postgresql://... pytest                # + DB integration tests (drops tables!)
+TEST_DATABASE_URL=postgresql://... pytest      # DB tests drop and recreate tables in that database
 ```
 
-## Not built yet (needs real design work)
+CI runs the same against Postgres 16 on every push (`.github/workflows/test.yml`).
 
-- **LLM fit scoring** (`pending_score` → `screened`): prompt, model choice, daily spend cap, and the 50-job hand check.
-- **Full-text fetch for Simplify** postings (they link out to Workday/iCIMS/etc.; no description in the feed).
-- **Workday and Hacker News** sources: Workday's endpoints are unofficial and per-tenant; HN "Who's hiring" is free text that needs parsing.
-- **Cross-source dedupe**: URL dedupe only catches the same link. The same job on Greenhouse and Simplify with different URLs is stored twice.
-- **Tailoring integration**, **live browser + Codex**, **Discord bot** (two-way; the webhook here is one-way), **outcome review**.
+## Security notes
+
+- CDP on port 9222 gives full control of the browser and every account logged into it. Keep it on Tailscale only.
+- The repo holds `data/standard_answers.yaml` and `data/profile.md`: keep it private.
+- The Vercel site is public by default and shows fit scores and application statuses.

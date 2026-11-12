@@ -23,8 +23,10 @@ def test_screening_applied_skip_and_prefilter(conn, monkeypatch):
     conn.commit()
     monkeypatch.setattr(screening.config, "load", lambda _: {
         "title_include": ["software engineer"], "title_exclude": ["senior"]})
+    monkeypatch.delenv("RESUME_SERVICE_URL", raising=False)
     stats = screening.screen_once(conn)
-    assert stats == {"captcha_expired": 0, "skipped_applied": 1, "pending_score": 1, "filtered_out": 1}
+    assert stats == {"captcha_expired": 0, "skipped_applied": 1, "pending_score": 1, "filtered_out": 1,
+                     "fulltext_fetched": 0}
 
 
 def test_captcha_timeout(conn):
@@ -41,7 +43,7 @@ def test_zero_result_alert_fires_once_then_recovery(conn):
     board = {"token": "t", "company": "T"}
     alerts = []
     with mock.patch.object(crawler.notify, "alert", alerts.append), \
-         mock.patch.object(crawler, "fetch_json", return_value={}):
+         mock.patch.object(crawler, "fetch_payload", return_value={}):
         mod.parse.return_value = [_p("https://a/1")]
         crawler.crawl_board(conn, None, mod, board)          # healthy
         mod.parse.return_value = []

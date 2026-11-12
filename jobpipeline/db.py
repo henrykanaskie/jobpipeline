@@ -4,6 +4,8 @@ from pathlib import Path
 import psycopg
 from psycopg.rows import dict_row
 
+from .normalize import normalize_title
+
 SCHEMA = Path(__file__).resolve().parent.parent / "db" / "schema.sql"
 
 
@@ -12,19 +14,33 @@ def connect(url: str | None = None) -> psycopg.Connection:
 
 
 def migrate(conn: psycopg.Connection) -> None:
+    # Several services start at once; the lock stops their migrations from colliding.
+    conn.execute("SELECT pg_advisory_xact_lock(727274)")
     conn.execute(SCHEMA.read_text())
     conn.commit()
 
 
+CROSS_SOURCE_DEDUPE_DAYS = 45
+
+
 def insert_postings(conn: psycopg.Connection, postings: list[dict]) -> list[dict]:
-    """Insert postings, skipping URLs already present. Returns the rows actually inserted."""
+    """Insert postings, skipping (a) URLs already present and (b) the same company + title
+    already seen from a *different* source recently (e.g. a Greenhouse job that Simplify also
+    lists under another link). Returns the rows actually inserted."""
     inserted = []
     with conn.cursor() as cur:
         for p in postings:
+            p = {**p, "dedupe_key": f"{p['company']}|{normalize_title(p['title'])}",
+                 "days": CROSS_SOURCE_DEDUPE_DAYS}
             cur.execute(
-                """INSERT INTO postings (source, company, company_display, title, location, url, full_text)
-                   VALUES (%(source)s, %(company)s, %(company_display)s, %(title)s, %(location)s,
-                           %(url)s, %(full_text)s)
+                """INSERT INTO postings (source, company, company_display, title, location, url,
+                                         full_text, dedupe_key)
+                   SELECT %(source)s, %(company)s, %(company_display)s, %(title)s, %(location)s,
+                          %(url)s, %(full_text)s, %(dedupe_key)s
+                   WHERE NOT EXISTS (
+                       SELECT 1 FROM postings
+                       WHERE dedupe_key = %(dedupe_key)s AND source <> %(source)s
+                         AND first_seen_at > now() - make_interval(days => %(days)s))
                    ON CONFLICT (url) DO NOTHING
                    RETURNING id, source, company_display, title, location, url""",
                 p,
