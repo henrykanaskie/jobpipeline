@@ -10,7 +10,7 @@ its contract is in [`docs/resume-service.md`](docs/resume-service.md). What's le
 | Service | What it does |
 | --- | --- |
 | `postgres` | Postings DB. Schema in `db/schema.sql`, applied/upgraded automatically on start |
-| `crawler` | Every 15 min: Greenhouse, Lever, Ashby, Simplify, Workday, Hacker News → `postings`. URL dedupe + cross-source dedupe (same company + title from another source within 45 days). Alerts when a board breaks or recovers |
+| `crawler` | Every 15 min: reads [carpet-crawler](https://crawler.carsonsecrest.me/)'s `data.json` (~4,300 ATS boards plus Simplify, newgrad-jobs.com and Hacker News) → `postings`. Optional direct crawls of Greenhouse, Lever, Ashby, Workday, Simplify and HN for companies it misses. URL dedupe + cross-source dedupe (same company + title from another source within 45 days). Alerts when a source breaks, recovers, or the feed goes stale |
 | `screening` | Every 60 s: CAPTCHA timeout → applied-company skip → keyword pre-filter → fetch missing descriptions → `/score` → `/tailor` for matches → poll until tailored |
 | `mcp` | MCP server for Claude Code and Codex (tools below) |
 | `browser` | Chromium + noVNC. You watch/solve CAPTCHAs from your phone; Codex drives it over CDP |

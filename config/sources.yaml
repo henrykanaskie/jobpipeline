@@ -1,26 +1,28 @@
-# Boards to crawl. `token` is the slug in the board's URL:
+# Where postings come from. Each top-level key is a source; each list item is one "board".
+
+# Primary: carpet-crawler already crawls ~4,300 ATS boards plus Simplify, newgrad-jobs.com
+# and Hacker News, so this one entry replaces crawling those yourself.
+carpet:
+  - token: carpet
+    tracks: [software, data, data-science]   # feed also has: product
+    new_grad_only: false                     # true = only postings the feed flags as new-grad
+    max_age_days: 60
+    max_stale_hours: 3                       # alert if the feed stops updating
+
+# Optional direct crawls, for companies carpet-crawler doesn't cover or that you want checked
+# on your own schedule. Postings that carpet-crawler also has are deduped automatically.
+# `token` is the slug in the board's URL:
 #   greenhouse: boards.greenhouse.io/<token>     lever: jobs.lever.co/<token>
 #   ashby:      jobs.ashbyhq.com/<token>
-# These are examples: check each one returns jobs (python -m jobpipeline.crawler --once) before relying on it.
-greenhouse:
-  - {token: stripe, company: Stripe}
-  - {token: discord, company: Discord}
-  - {token: databricks, company: Databricks}
-lever:
-  - {token: palantir, company: Palantir}
-ashby:
-  - {token: ramp, company: Ramp}
-  - {token: notion, company: Notion}
-simplify:
-  - token: new-grad
-    url: https://raw.githubusercontent.com/SimplifyJobs/New-Grad-Positions/dev/.github/scripts/listings.json
-# Workday: `url` is the career-site page you'd open in a browser. Always set `search`
-# (each crawl reads at most 200 postings per board). Unofficial API: expect breakage.
-workday:
-  - token: nvidia
-    company: NVIDIA
-    url: https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite
-    search: software engineer
-# Latest "Ask HN: Who is hiring?" thread. Parsing is best-effort; the pre-filter does the rest.
-hackernews:
-  - {token: whoishiring}
+# greenhouse:
+#   - {token: stripe, company: Stripe}
+# lever:
+#   - {token: palantir, company: Palantir}
+# ashby:
+#   - {token: ramp, company: Ramp}
+# workday:   # `url` is the career-site page; always set `search` (max 200 postings per crawl)
+#   - {token: nvidia, company: NVIDIA, url: "https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite", search: software engineer}
+# simplify:  # already included in carpet-crawler
+#   - {token: new-grad, url: "https://raw.githubusercontent.com/SimplifyJobs/New-Grad-Positions/dev/.github/scripts/listings.json"}
+# hackernews:  # already included in carpet-crawler
+#   - {token: whoishiring}
