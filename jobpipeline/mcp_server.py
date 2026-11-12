@@ -4,11 +4,16 @@
     python -m jobpipeline.mcp_server --http --port 8765   # streamable HTTP (reach it over Tailscale)
 """
 import argparse
+import os
 from datetime import datetime
+from pathlib import Path
 
+import yaml
 from mcp.server.mcpserver import MCPServer
 
-from . import db
+from . import db, notify
+
+STANDARD_ANSWERS = Path(__file__).resolve().parent.parent / "data" / "standard_answers.yaml"
 
 APPLICATION_STATUSES = {"in_progress", "captcha_wait", "submitted", "needs_manual", "failed"}
 OUTCOMES = {"no_response", "rejected", "interview", "offer"}
@@ -101,6 +106,55 @@ def record_application(posting_id: str, status: str, resume_path: str | None = N
         ).fetchone()
         conn.commit()
     return _jsonable(row)
+
+
+@server.tool()
+def report_captcha(posting_id: str, note: str | None = None) -> dict:
+    """Call when a CAPTCHA blocks the application. Sets status captcha_wait (starting the
+    30-minute timer) and pushes a Discord alert with the live-browser link so a human can solve it.
+    Then wait, and check get_posting(...)['application']['status'] before continuing."""
+    app = record_application(posting_id, "captcha_wait", notes=note)
+    with db.connect() as conn:
+        posting = conn.execute("SELECT company_display, title FROM postings WHERE id = %s",
+                               (posting_id,)).fetchone()
+    notify.captcha(posting, note)
+    return app
+
+
+@server.tool()
+def ask_human(posting_id: str, message: str) -> str:
+    """Push a Discord alert (with the live-browser link) when you need a decision: a form field
+    not covered by get_standard_answers, an application ready for Submit approval, or anything
+    unclear. Does not change application status."""
+    with db.connect() as conn:
+        p = conn.execute("SELECT company_display, title FROM postings WHERE id = %s", (posting_id,)).fetchone()
+    if p is None:
+        raise ValueError(f"no posting with id {posting_id}")
+    live = os.environ.get("LIVE_BROWSER_URL", "")
+    notify.alert(f":raising_hand: {p['company_display']} · {p['title']}: {message}\n{live}")
+    return "sent"
+
+
+@server.tool()
+def list_applications(status: str | None = None, limit: int = 50) -> list[dict]:
+    """Applications with their posting's company/title/url, newest first, optionally by status."""
+    sql = """SELECT a.*, p.company_display, p.title, p.url FROM applications a
+             JOIN postings p ON p.id = a.posting_id"""
+    params: list = []
+    if status:
+        sql += " WHERE a.status = %s"
+        params.append(status)
+    sql += " ORDER BY a.updated_at DESC LIMIT %s"
+    params.append(max(1, min(limit, 200)))
+    with db.connect() as conn:
+        return [_jsonable(r) for r in conn.execute(sql, params).fetchall()]
+
+
+@server.tool()
+def get_standard_answers() -> dict:
+    """The ONLY allowed answers for work authorization, sponsorship, EEO, salary, start date and
+    links. A null value means 'unknown': do not guess; mark the application needs_manual."""
+    return yaml.safe_load(STANDARD_ANSWERS.read_text()) or {}
 
 
 def main():

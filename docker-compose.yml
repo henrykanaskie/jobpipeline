@@ -1,4 +1,20 @@
-# docker compose up -d   — Postgres + crawler + screening (+ MCP over HTTP on the host's Tailscale IP)
+# docker compose up -d --build
+# Every port binds to 127.0.0.1 on the host on purpose. Share what you need over Tailscale:
+#   tailscale serve --bg --tcp 5432 tcp://localhost:5432     # Postgres, from your Mac
+#   tailscale serve --bg --tcp 8765 tcp://localhost:8765     # MCP server
+#   tailscale serve --bg --https 6080 http://localhost:6080  # live browser (phone)
+#   tailscale serve --bg --tcp 9222 tcp://localhost:9222     # CDP for Codex
+# Never bind these to 0.0.0.0 on a home network.
+x-app: &app
+  build: .
+  restart: unless-stopped
+  env_file:
+    - path: .env
+      required: false
+  environment:
+    DATABASE_URL: postgresql://jobs:${POSTGRES_PASSWORD}@postgres:5432/jobs
+  depends_on: {postgres: {condition: service_healthy}}
+
 services:
   postgres:
     image: postgres:16
@@ -9,10 +25,6 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./db/schema.sql:/docker-entrypoint-initdb.d/001_schema.sql:ro
-    # Bound to localhost only. Reach it from your Mac over Tailscale with
-    #   tailscale serve --tcp 5432 tcp://localhost:5432
-    # (or change to "<tailscale-ip>:5432:5432"). Never bind to 0.0.0.0 on a home network.
     ports: ["127.0.0.1:5432:5432"]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U jobs -d jobs"]
@@ -20,34 +32,42 @@ services:
       retries: 10
 
   crawler:
-    build: .
+    <<: *app
     command: python -m jobpipeline.crawler
-    restart: unless-stopped
-    env_file: .env
-    environment:
-      DATABASE_URL: postgresql://jobs:${POSTGRES_PASSWORD}@postgres:5432/jobs
     volumes: ["./config:/app/config:ro"]
-    depends_on: {postgres: {condition: service_healthy}}
 
   screening:
-    build: .
+    <<: *app
     command: python -m jobpipeline.screening
-    restart: unless-stopped
-    env_file: .env
-    environment:
-      DATABASE_URL: postgresql://jobs:${POSTGRES_PASSWORD}@postgres:5432/jobs
     volumes: ["./config:/app/config:ro"]
-    depends_on: {postgres: {condition: service_healthy}}
+    # lets RESUME_SERVICE_URL=http://host.docker.internal:<port> reach a service running on the host
+    extra_hosts: ["host.docker.internal:host-gateway"]
 
   mcp:
-    build: .
+    <<: *app
     command: python -m jobpipeline.mcp_server --http --host 0.0.0.0 --port 8765
+    volumes: ["./data:/app/data:ro"]
+    ports: ["127.0.0.1:8765:8765"]
+
+  browser:
+    build: ./browser
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql://jobs:${POSTGRES_PASSWORD}@postgres:5432/jobs
-    # Localhost only; expose to your tailnet with: tailscale serve --tcp 8765 tcp://localhost:8765
-    ports: ["127.0.0.1:8765:8765"]
+      VNC_PASSWORD: ${VNC_PASSWORD:?set VNC_PASSWORD in .env}
+    volumes: ["browser-profile:/profile"]   # keeps ATS logins between restarts
+    shm_size: 1gb                           # Chromium crashes with Docker's 64 MB default
+    ports: ["127.0.0.1:6080:6080", "127.0.0.1:9222:9222"]
+
+  backup:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+    volumes: ["./backups:/backups"]
     depends_on: {postgres: {condition: service_healthy}}
+    # nightly dump, keep 14 days
+    entrypoint: ["sh", "-c", "while true; do pg_dump -h postgres -U jobs jobs | gzip > /backups/jobs-$$(date +%F).sql.gz && find /backups -name '*.sql.gz' -mtime +14 -delete; sleep 86400; done"]
 
 volumes:
   pgdata:
+  browser-profile:

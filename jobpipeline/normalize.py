@@ -36,7 +36,12 @@ def html_to_text(raw: str | None) -> str:
     if not raw:
         return ""
     s = html.unescape(html.unescape(raw))
-    s = re.sub(r"<(br|/p|/li|/h\d|/div)\s*/?>", "\n", s, flags=re.I)
+    s = re.sub(r"<(br|p|/p|li|/li|/h\d|/div)\b[^>]*>", "\n", s, flags=re.I)
     s = re.sub(r"<[^>]+>", "", s)
     s = re.sub(r"[ \t]+", " ", s)
     return re.sub(r"\n\s*\n+", "\n\n", s).strip()
+
+
+def normalize_title(title: str) -> str:
+    """'Software Engineer, New Grad (2027)' -> 'software engineer new grad 2027'."""
+    return " ".join(re.sub(r"[^a-z0-9 ]+", " ", title.lower()).split())

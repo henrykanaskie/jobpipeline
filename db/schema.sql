@@ -1,28 +1,46 @@
--- Postings DB: single source of truth. Idempotent; safe to run on every start.
+-- Postings DB: single source of truth. Idempotent; runs on every service start,
+-- so new columns are added with ADD COLUMN IF NOT EXISTS and checks are re-created.
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 CREATE TABLE IF NOT EXISTS postings (
-    id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    source         text NOT NULL,                -- workday, greenhouse, lever, ashby, simplify, ...
-    company        text NOT NULL,                -- normalized; used for the applied filter
-    company_display text NOT NULL,               -- as shown by the source
-    title          text NOT NULL,
-    location       text,
-    url            text NOT NULL UNIQUE,         -- normalized; dedupe key
-    full_text      text,
-    fit_score      numeric CHECK (fit_score BETWEEN 0 AND 100),
-    first_seen_at  timestamptz NOT NULL DEFAULT now(),
-    status         text NOT NULL DEFAULT 'new' CHECK (status IN (
-                     'new',             -- just crawled
-                     'skipped_applied', -- company already in applications
-                     'filtered_out',    -- failed keyword pre-filter
-                     'pending_score',   -- passed pre-filter, waiting for the LLM scorer
-                     'screened',        -- scored
-                     'tailored'))       -- tailored resume produced
+    id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    source          text NOT NULL,                -- workday, greenhouse, lever, ashby, simplify, hackernews
+    company         text NOT NULL,                -- normalized; used for the applied filter
+    company_display text NOT NULL,
+    title           text NOT NULL,
+    location        text,
+    url             text NOT NULL UNIQUE,         -- normalized; dedupe key
+    full_text       text,
+    fit_score       numeric,
+    first_seen_at   timestamptz NOT NULL DEFAULT now(),
+    status          text NOT NULL DEFAULT 'new'
 );
+ALTER TABLE postings ADD COLUMN IF NOT EXISTS dedupe_key text;           -- company|title, cross-source dedupe
+ALTER TABLE postings ADD COLUMN IF NOT EXISTS fit_reasons text;          -- from the resume service
+ALTER TABLE postings ADD COLUMN IF NOT EXISTS scored_at timestamptz;
+ALTER TABLE postings ADD COLUMN IF NOT EXISTS fulltext_attempts integer NOT NULL DEFAULT 0;
+ALTER TABLE postings ADD COLUMN IF NOT EXISTS tailor_requested_at timestamptz;
+ALTER TABLE postings ADD COLUMN IF NOT EXISTS resume_path text;          -- tailored resume
+ALTER TABLE postings ADD COLUMN IF NOT EXISTS tailor_summary text;       -- what changed and why
+ALTER TABLE postings ADD COLUMN IF NOT EXISTS tailor_error text;
+
+ALTER TABLE postings DROP CONSTRAINT IF EXISTS postings_fit_score_check;
+ALTER TABLE postings ADD CONSTRAINT postings_fit_score_check CHECK (fit_score BETWEEN 0 AND 100);
+ALTER TABLE postings DROP CONSTRAINT IF EXISTS postings_status_check;
+ALTER TABLE postings ADD CONSTRAINT postings_status_check CHECK (status IN (
+    'new',             -- just crawled
+    'skipped_applied', -- company already in applications
+    'filtered_out',    -- failed keyword pre-filter
+    'pending_score',   -- passed pre-filter; waiting for full text and a fit score
+    'screened',        -- scored below the match threshold
+    'tailoring',       -- match; tailoring requested from the resume service
+    'tailored',        -- tailored resume ready (resume_path)
+    'tailor_failed'));  -- resume service reported failure (tailor_error)
+
 CREATE INDEX IF NOT EXISTS postings_status_idx  ON postings (status);
 CREATE INDEX IF NOT EXISTS postings_company_idx ON postings (company);
 CREATE INDEX IF NOT EXISTS postings_seen_idx    ON postings (first_seen_at DESC);
+CREATE INDEX IF NOT EXISTS postings_dedupe_idx  ON postings (dedupe_key);
 
 CREATE TABLE IF NOT EXISTS applications (
     id                 uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -51,3 +69,9 @@ CREATE TABLE IF NOT EXISTS source_runs (
     error     text
 );
 CREATE INDEX IF NOT EXISTS source_runs_board_idx ON source_runs (source, board, ran_at DESC);
+
+-- Calls to the resume service's /score, for the daily cap.
+CREATE TABLE IF NOT EXISTS score_calls (
+    id        bigserial PRIMARY KEY,
+    called_at timestamptz NOT NULL DEFAULT now()
+);

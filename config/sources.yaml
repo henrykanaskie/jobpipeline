@@ -14,3 +14,13 @@ ashby:
 simplify:
   - token: new-grad
     url: https://raw.githubusercontent.com/SimplifyJobs/New-Grad-Positions/dev/.github/scripts/listings.json
+# Workday: `url` is the career-site page you'd open in a browser. Always set `search`
+# (each crawl reads at most 200 postings per board). Unofficial API: expect breakage.
+workday:
+  - token: nvidia
+    company: NVIDIA
+    url: https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite
+    search: software engineer
+# Latest "Ask HN: Who is hiring?" thread. Parsing is best-effort; the pre-filter does the rest.
+hackernews:
+  - {token: whoishiring}
