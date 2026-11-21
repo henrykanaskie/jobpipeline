@@ -41,7 +41,7 @@ Ordered roughly by when it blocks you. ⚠ marks things only you can decide or d
 
 ## 4. First-run verification (couldn't be tested from the build sandbox)
 
-- [ ] `docker compose run --rm crawler python -m jobpipeline.crawler --once`: every source shows `fetched > 0` (carpet-crawler, Greenhouse, Lever, Ashby and HN were verified live; Workday only on sample data)
+- [ ] `docker compose run --rm crawler python -m jobpipeline.crawler --once`: every source shows `fetched > 0` (carpet-crawler, Greenhouse, Lever, Ashby and HN were verified live; Workday live against Salesforce on wd12, while NVIDIA on wd5 was in a Workday maintenance window and correctly raised an error)
 - [ ] `docker compose build browser` and open noVNC from your phone; check Codex can connect over CDP (use the host's Tailscale IP, not its name)
 - [ ] Run a week of crawls: no duplicates, no crashes (phase 2 "done when")
 - [ ] Restore a backup once into a scratch database, so you know the backups work
@@ -63,8 +63,9 @@ Ordered roughly by when it blocks you. ⚠ marks things only you can decide or d
 ## Known limitations (acceptable for now)
 
 - Cross-source dedupe matches on company + exact normalized title; a retitled duplicate gets through
-- Descriptions for JavaScript-only pages (e.g. Ashby links from Simplify) can't be fetched; those postings are scored on title and company only
-- Hacker News parsing assumes `Company | Role | Location` on the first line; unusual formats are skipped or misread
-- Workday reads at most 200 postings per board per crawl, so set a `search` term
+- Descriptions for JavaScript-only pages (e.g. Workable, Oracle, BambooHR links from Simplify) can't be fetched; those postings are scored on title and company only
+- Description fetch skips pages behind a login or a bot challenge and doesn't retry them. It waits 5 s between requests to the same host, so a batch of 20 postings on one host takes about 100 s
+- Hacker News parsing reads the `Company | Role | Location` first line and skips comments where no part reads as a role (about a third of a typical thread, e.g. `Acme | ONSITE | SF` with roles only in the body). The posting URL is the HN comment; the outbound link is parsed but not stored
+- Workday reads at most `max_postings` (default 200) postings per board per crawl and logs a warning when it stops early, so set a `search` term. `N Locations` postings show only the first location from the job path
 - carpet-crawler is someone else's service: if it changes its `data.json` shape, the crawler errors and alerts rather than failing silently, but you'll need to update `jobpipeline/sources/carpet.py`
 - The carpet feed has no descriptions; Screening fetches them only for postings that pass the pre-filter (iCIMS/Oracle pages may be JavaScript-only, in which case they're scored on title and company)

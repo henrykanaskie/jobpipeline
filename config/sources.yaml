@@ -20,8 +20,11 @@ carpet:
 #   - {token: palantir, company: Palantir}
 # ashby:
 #   - {token: ramp, company: Ramp}
-# workday:   # `url` is the career-site page; always set `search` (max 200 postings per crawl)
+# workday:   # unofficial endpoint; always set `search`. max_postings (default 200) caps paging per crawl.
+#   # either the career-site page URL...
 #   - {token: nvidia, company: NVIDIA, url: "https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite", search: software engineer}
+#   # ...or host/tenant/site explicitly (from https://<host>/wday/cxs/<tenant>/<site>/jobs in the browser's network tab)
+#   - {token: salesforce, company: Salesforce, host: salesforce.wd12.myworkdayjobs.com, tenant: salesforce, site: External_Career_Site, search: software engineer, max_postings: 100}
 # simplify:  # already included in carpet-crawler
 #   - {token: new-grad, url: "https://raw.githubusercontent.com/SimplifyJobs/New-Grad-Positions/dev/.github/scripts/listings.json"}
 # hackernews:  # already included in carpet-crawler
