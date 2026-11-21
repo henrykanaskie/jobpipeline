@@ -29,3 +29,7 @@ carpet:
 #   - {token: new-grad, url: "https://raw.githubusercontent.com/SimplifyJobs/New-Grad-Positions/dev/.github/scripts/listings.json"}
 # hackernews:  # already included in carpet-crawler
 #   - {token: whoishiring}
+#   # Headers that list the jobs in the body, and sentences written where a header
+#   # should be, are read by a second pass (about 15% more of the thread kept).
+#   # Set strict to skip anything that does not name its role in the header:
+#   - {token: whoishiring, strict: true}
