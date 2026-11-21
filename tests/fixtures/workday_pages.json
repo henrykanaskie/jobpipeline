@@ -1,0 +1,67 @@
+[
+ {
+  "total": 5,
+  "jobPostings": [
+   {
+    "title": "LMTS - Lead AI/ML Engineer (LLM Post-Training)",
+    "externalPath": "/job/India---Bangalore/LMTS---Lead-AI-ML-Engineer--LLM-Post-Training-_JR368314",
+    "locationsText": "2 Locations",
+    "postedOn": "Posted Today",
+    "bulletFields": [
+     "JR368314"
+    ]
+   },
+   {
+    "title": "Senior Instructor",
+    "externalPath": "/job/Mexico---Mexico-City/Senior-Technical-Enablement-Specialist---MuleSoft---Tableau_JR365265-1",
+    "locationsText": "Mexico - Mexico City",
+    "postedOn": "Posted Yesterday",
+    "bulletFields": [
+     "JR365265"
+    ]
+   },
+   {
+    "title": "Lead/ Principal Forward Deployed Engineer",
+    "externalPath": "/job/United-Arab-Emirates---Dubai/Forward-Deployed-Engineer_JR348987",
+    "locationsText": "United Arab Emirates - Dubai",
+    "postedOn": "Posted Yesterday",
+    "bulletFields": [
+     "JR348987"
+    ]
+   }
+  ],
+  "userAuthenticated": false
+ },
+ {
+  "total": 0,
+  "jobPostings": [
+   {
+    "title": "Software Engineer Infrastructure and Distributed Systems",
+    "externalPath": "/job/California---San-Francisco/Software-Engineer-Infrastructure-and-Distributed-Systems_JR368687",
+    "locationsText": "California - San Francisco",
+    "postedOn": "Posted 2 Days Ago",
+    "bulletFields": [
+     "JR368687"
+    ]
+   },
+   {
+    "title": "Lead, Account Solution Engineer/Manufacturing & Automotive",
+    "externalPath": "/job/Canada---Montreal/Lead--Account-Solution-Engineer-Manufacturing---Automotive_JR366056",
+    "locationsText": "2 Locations",
+    "postedOn": "Posted 2 Days Ago",
+    "bulletFields": [
+     "JR366056"
+    ]
+   },
+   {
+    "title": "Missing path",
+    "locationsText": "Remote",
+    "postedOn": "Posted Today"
+   },
+   {
+    "externalPath": "/job/X/No-Title_JR1"
+   }
+  ],
+  "userAuthenticated": false
+ }
+]

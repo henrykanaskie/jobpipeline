@@ -13,7 +13,7 @@ MIN_TEXT_CHARS = 200     # less than this usually means a JavaScript-only page
 
 def _workday_api_url(url: str) -> str | None:
     parts = urlsplit(url)
-    if "myworkdayjobs.com" not in parts.netloc or "/job/" not in parts.path:
+    if not parts.netloc.endswith(("myworkdayjobs.com", "myworkdaysite.com")) or "/job/" not in parts.path:
         return None
     site_path, job_path = parts.path.split("/job/", 1)
     base = workday.api_base(f"https://{parts.netloc}{site_path}")

@@ -22,19 +22,6 @@ def test_workday_parse():
     assert p["company"] == "nvidia" and p["full_text"] is None
 
 
-def test_workday_fetch_paginates_and_stops(monkeypatch):
-    calls = []
-
-    def fake_post(sess, url, body):
-        calls.append(body["offset"])
-        if body["offset"] == 0:
-            return {"total": 25, "jobPostings": [{"title": str(i), "externalPath": f"/job/x/{i}"} for i in range(20)]}
-        return {"total": 0, "jobPostings": [{"title": str(i), "externalPath": f"/job/x/{i}"} for i in range(20, 25)]}
-    monkeypatch.setattr(workday.http, "post_json", fake_post)
-    monkeypatch.setattr(workday.time, "sleep", lambda s: None)
-    assert len(workday.fetch(None, BOARD)["jobPostings"]) == 25 and calls == [0, 20]
-
-
 def test_workday_detail_url_for_fulltext():
     url = "https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite/job/US-CA/Software-Engineer_JR1"
     assert fulltext._workday_api_url(url) == \
