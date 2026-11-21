@@ -51,4 +51,4 @@ def test_hackernews_parse():
     a, b = hackernews.parse(payload, {"token": "whoishiring"})
     assert (a["company_display"], a["title"], a["location"]) == ("Acme Robotics", "Senior Backend Engineer", "Remote (US)")
     assert a["url"] == "https://news.ycombinator.com/item?id=101" and "robots" in a["full_text"]
-    assert (b["title"], b["location"]) == ("Full-stack Developer", "NYC")
+    assert (b["title"], b["location"]) == ("Full-stack Developer", "NYC; ONSITE")
