@@ -19,10 +19,11 @@ def _retryable(e: Exception) -> bool:
     return isinstance(e, (requests.ConnectionError, requests.Timeout))
 
 
-def request(sess: requests.Session, method: str, url: str, attempts: int = 4, **kw) -> requests.Response:
+def request(sess: requests.Session, method: str, url: str, attempts: int = 4, timeout: float = 30,
+            **kw) -> requests.Response:
     for i in range(attempts):
         try:
-            r = sess.request(method, url, timeout=30, **kw)
+            r = sess.request(method, url, timeout=timeout, **kw)
             r.raise_for_status()
             return r
         except requests.RequestException as e:
